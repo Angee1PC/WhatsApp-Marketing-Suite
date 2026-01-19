@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+env/
+
+# Sensitive User Data (CRITICAL)
+session_data/
+*.json
+!config.json
+
+# Logs
+*.log
+activity.log
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Local config (if any specific user overrides)
+license.key

@@ -1,0 +1,12 @@
+{
+    "excel_path": "data/contacts.xlsx",
+    "output_path": "data/responses.xlsx",
+    "session_path": "session_data",
+    "admin_number": "522205511054",
+    "message_template": "Estimado {Nombre}, necesitamos reconfirmar tu horario de visita. \u00bfSigues disponible? Responde S\u00cd o NO.",
+    "scan_timeout": 60,
+    "wait_between_messages": [
+        5,
+        10
+    ]
+}
