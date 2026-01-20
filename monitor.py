@@ -10,7 +10,7 @@ def load_config():
 def run_monitor():
     try:
         config = load_config()
-        handler = DataHandler(config['excel_path'])
+        handler = DataHandler(config.get('excel_path', 'data/contacts.xlsx'))
         print("Config/Data loaded. Starting monitor...")
         
         bot = WhatsAppBot(config)
@@ -21,14 +21,17 @@ def run_monitor():
         try:
             while True:
                 # Check every 10 seconds for testing
-                unread_list = bot.get_unread_messages()
+                # Get current expected contacts
+                whitelist = handler.get_whitelist()
+                unread_list = bot.get_unread_messages(whitelist=whitelist)
                 
                 for chat in unread_list:
-                    name = chat['sender']
-                    msg = chat['message']
+                    name = chat.get('sender', 'Unknown')
+                    phone = chat.get('phone', '')
+                    msg = chat.get('message', '')
                     print(f"New interaction from {name}: {msg}")
                     
-                    found, classification = handler.log_response(name, msg)
+                    found, classification = handler.log_response(name, msg, phone_context=phone)
                     if found:
                          print(f" -> Saved to Excel. Classification: {classification}")
                     else:

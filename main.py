@@ -7,13 +7,14 @@ def load_config():
     with open('config.json', 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def main():
+def main(wait_for_input=True):
     try:
         config = load_config()
         print("Config loaded.")
         
-        handler = DataHandler(config['excel_path'])
-        print(f"Data loaded from {config['excel_path']}")
+        excel_path = config.get('excel_path', 'data/contacts.xlsx')
+        handler = DataHandler(excel_path)
+        print(f"Data loaded from {excel_path}")
         
         pending_contacts = handler.get_pending_contacts()
         
@@ -28,7 +29,14 @@ def main():
         
         for index, row in pending_contacts.iterrows():
             name = row['Nombre']
-            phone = row['Telefono']
+            raw_phone = str(row['Telefono'])
+            
+            # Auto-format Phone: Remove non-digits
+            phone = "".join(filter(str.isdigit, raw_phone))
+            
+            # If 10 digits (Mexico Standard), Add 52 automatically
+            if len(phone) == 10:
+                phone = "52" + phone
             
             # Dynamic template replacement
             message = config['message_template']
@@ -47,12 +55,20 @@ def main():
                 handler.update_status(index, 'Error')
                 
         print("Batch processing complete.")
-        input("Press Enter to close browser...") # Keep open to see result
+        if wait_for_input:
+            input("Press Enter to close browser...")
+        else:
+            print("Closing browser automatically.")
+        
         bot.close()
+        return True
         
     except Exception as e:
         print(f"An error occurred: {e}")
-        input("Press Enter to exit...")
+        print(f"An error occurred: {e}")
+        if wait_for_input:
+            input("Press Enter to exit...")
+        return False
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@
     "output_path": "data/responses.xlsx",
     "session_path": "session_data",
     "admin_number": "522205511054",
-    "message_template": "Estimado {Nombre}, necesitamos reconfirmar tu horario de visita. \u00bfSigues disponible? Responde S\u00cd o NO.",
+    "message_template": "\u00a1Hola {Nombre}! \ud83c\udfe0 Soy tu asesor digital. Tenemos nuevas ubicaciones disponibles que coinciden con tu b\u00fasqueda. \u00bfTe gustar\u00eda ver las fotos?",
     "scan_timeout": 60,
     "wait_between_messages": [
         5,

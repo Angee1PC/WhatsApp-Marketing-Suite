@@ -24,14 +24,16 @@ class ReportGenerator:
         
         report += f"✅ *Interesados*: {len(interesados)}\n"
         for _, row in interesados.iterrows():
-            report += f"- {row['Nombre']}: {str(row['Respuesta'])[:40]}...\n"
+            resp = str(row['Respuesta']) if pd.notna(row['Respuesta']) else "..."
+            report += f"- {row['Nombre']}: {resp[:40]}...\n"
             
         report += f"\n❌ *No Interesados*: {len(no_interesados)}\n"
         
         if not otros.empty:
             report += f"\n⚠️ *Por revisar/Desconocido*: {len(otros)}\n"
             for _, row in otros.iterrows():
-                report += f"- {row['Nombre']}: {str(row['Respuesta'])[:40]}...\n"
+                resp = str(row['Respuesta']) if pd.notna(row['Respuesta']) else "..."
+                report += f"- {row['Nombre']}: {resp[:40]}...\n"
         
         # Count pending (Pendiente OR Enviado because Enviado means no response yet)
         pendientes = df[df['Estado'].isin(['Pendiente', 'Enviado'])]
