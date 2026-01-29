@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Data Tracker & Tasks (App)</title>
+
+    <!-- PWA Setup -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#01A982">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/1087/1087815.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+
+        .loading-spinner {
+            border-top: 4px solid #01A982;
+            border-right: 4px solid transparent;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .record-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .record-details.open {
+            max-height: 1000px;
+            transition: max-height 0.5s ease-in;
+        }
+
+        .milestone-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+            line-height: 1;
+        }
+
+        .tab-button.active {
+            border-color: #06b6d4;
+            /* teal-500 */
+            background-color: #ffffff;
+            color: #06b6d4;
+        }
+
+        .tab-button {
+            border-bottom-width: 2px;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+        }
+
+        .badge-count {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            line-height: 1;
+        }
+    </style>
+</head>
+
+<body class="text-gray-800">
+
+    <div id="app" class="min-h-screen">
+        <div id="loading-overlay" class="fixed inset-0 bg-white/75 flex flex-col items-center justify-center z-50">
+            <div class="loading-spinner mb-4"></div>
+            <p class="text-xl font-semibold text-[#01A982]">Loading application and local data...</p>
+        </div>
+
+        <header class="sticky top-0 z-10 bg-[#01A982] shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="text-4xl text-white">
+                        📈
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-white">Project Data Tracker (Offline)</h1>
+                </div>
+                <div class="text-right flex flex-col items-end">
+                    <p id="storage-status" class="text-sm text-green-200">Storage: LocalStorage</p>
+                    <p class="text-xs text-green-100 opacity-70">v2.7 (Manual Release Notes)</p>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+            <h2 class="text-4xl font-bold mb-8 text-gray-800">Workspace</h2>
+
+            <div class="grid grid-cols-1 gap-8">
+
+                <div>
+                    <div class="flex flex-wrap items-end border-b border-gray-300 mb-6 bg-white rounded-t-xl shadow-md">
+                        <button id="tab-btn-tasks" onclick="switchTab('tasks')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm text-gray-500 hover:text-teal-600 border-b-2 border-transparent hover:border-gray-200">
+                            Tasks To Do
+                            <span id="pending-tasks-badge" class="badge-count bg-indigo-500 hidden">0</span>
+                        </button>
+
+                        <button id="tab-btn-data-entry" onclick="switchTab('data-entry')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm transition-colors border-b-2 border-transparent">
+                            Data Entry
+                        </button>
+
+                        <button id="tab-btn-follow-up" onclick="switchTab('follow-up')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm text-gray-500 hover:text-teal-600 border-b-2 border-transparent hover:border-gray-200">
+                            Follow-up
+                            <span id="follow-up-count-badge" class="badge-count bg-red-400 hidden">0</span>
+                        </button>
+
+                        <button id="tab-btn-backlog" onclick="switchTab('backlog')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm text-gray-500 hover:text-teal-600 border-b-2 border-transparent hover:border-gray-200">
+                            Backlog (SO#)
+                            <span id="backlog-count-badge" class="badge-count bg-orange-500 hidden">0</span>
+                        </button>
+
+                        <button id="tab-btn-history" onclick="switchTab('history')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm text-gray-500 hover:text-teal-600 border-b-2 border-transparent hover:border-gray-200">
+                            Project History
+                        </button>
+
+                        <button id="tab-btn-support" onclick="switchTab('support')"
+                            class="tab-button flex-1 py-3 px-4 text-center font-semibold text-sm text-gray-500 hover:text-teal-600 border-b-2 border-transparent hover:border-gray-200">
+                            Support
+                        </button>
+                    </div>
+
+                    <div id="tab-content">
+
+                        <div id="tab-tasks" class="tab-pane hidden">
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <div class="lg:col-span-1">
+                                    <div
+                                        class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 sticky top-24">
+                                        <h3 class="text-xl font-bold text-gray-800 mb-4">New Task</h3>
+                                        <form id="task-form" onsubmit="addTask(event)">
+                                            <div class="space-y-4">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-700 mb-1">Task
+                                                        Description</label>
+                                                    <textarea id="task-desc" required rows="3"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]"
+                                                        placeholder="What needs to be done?"></textarea>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-700 mb-1">Related
+                                                        Loan # (Optional)</label>
+                                                    <input type="text" id="task-loan"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]"
+                                                        placeholder="e.g. 123456">
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label
+                                                            class="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+                                                        <select id="task-priority"
+                                                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500">
+                                                            <option value="High">High 🔥</option>
+                                                            <option value="Medium" selected>Medium ⚡</option>
+                                                            <option value="Low">Low ☕</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-medium text-gray-700 mb-1">Due
+                                                            Date</label>
+                                                        <input type="date" id="task-due"
+                                                            class="w-full p-2 border border-gray-300 rounded-lg">
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-700 mb-2">Context
+                                                        (Where does this belong?)</label>
+                                                    <div class="flex space-x-3">
+                                                        <label class="flex items-center space-x-1 cursor-pointer">
+                                                            <input type="radio" name="task-context" value="general"
+                                                                checked class="text-indigo-600 focus:ring-indigo-500">
+                                                            <span class="text-xs text-gray-700">General</span>
+                                                        </label>
+                                                        <label class="flex items-center space-x-1 cursor-pointer">
+                                                            <input type="radio" name="task-context" value="follow-up"
+                                                                class="text-teal-500 focus:ring-teal-500">
+                                                            <span
+                                                                class="text-xs text-teal-700 font-semibold">Follow-up</span>
+                                                        </label>
+                                                        <label class="flex items-center space-x-1 cursor-pointer">
+                                                            <input type="radio" name="task-context" value="backlog"
+                                                                class="text-orange-500 focus:ring-orange-500">
+                                                            <span
+                                                                class="text-xs text-orange-700 font-semibold">Backlog</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <button type="submit"
+                                                    class="w-full py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition">
+                                                    Add Task
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="lg:col-span-2 space-y-6">
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                                            Pending Tasks
+                                            <span id="task-count-display"
+                                                class="ml-2 text-sm font-normal text-gray-500">(0)</span>
+                                        </h3>
+                                        <div id="pending-tasks-list" class="space-y-3"></div>
+                                    </div>
+                                    <div class="pt-6 border-t border-gray-200">
+                                        <div class="flex justify-between items-center mb-3">
+                                            <h3 class="text-lg font-bold text-gray-600">Completed</h3>
+                                            <button onclick="clearCompletedTasks()"
+                                                class="text-xs text-red-500 hover:text-red-700 underline">Clear
+                                                History</button>
+                                        </div>
+                                        <div id="completed-tasks-list" class="space-y-2 opacity-75"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tab-data-entry" class="tab-pane hidden">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4">Entry Control</h3>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div class="lg:col-span-2">
+                                    <div id="input-form-card"
+                                        class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-teal-500">
+                                        <h3 id="form-title" class="text-2xl font-bold text-gray-800 mb-4">Entry/Edit
+                                            Project</h3>
+                                        <form id="record-form">
+                                            <input type="hidden" id="record-id">
+
+                                            <div class="flex items-center justify-between mt-4 mb-2 border-b pb-1">
+                                                <h4 class="text-lg font-semibold text-teal-600">Loan Registration</h4>
+                                                <label class="flex items-center space-x-1 text-sm text-gray-700">
+                                                    <input type="checkbox" id="internal-flag"
+                                                        onchange="applyInternalDefaults()"
+                                                        class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                    <span>Internal</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-4 mb-3">
+                                                <div class="col-span-1">
+                                                    <label for="loan-number"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Loan #
+                                                        (Number Only)</label>
+                                                    <input type="text" id="loan-number" required
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]"
+                                                        placeholder="e.g. 123456">
+                                                </div>
+                                                <div class="col-span-1">
+                                                    <label for="date"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                                                    <input type="date" id="date"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                class="grid grid-cols-2 gap-4 mb-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                                                <div class="col-span-1">
+                                                    <label for="customer"
+                                                        class="block text-xs font-bold text-gray-700 mb-1">Customer
+                                                        Name</label>
+                                                    <input type="text" id="customer"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]"
+                                                        placeholder="Client Name">
+                                                </div>
+                                                <div class="col-span-1">
+                                                    <label for="product"
+                                                        class="block text-xs font-bold text-gray-700 mb-1">Product</label>
+                                                    <input type="text" id="product"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]"
+                                                        placeholder="e.g. Server X">
+                                                </div>
+                                            </div>
+
+                                            <div class="grid grid-cols-2 gap-4 mb-4 mt-4">
+                                                <div class="col-span-1">
+                                                    <label for="so-number"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">SO
+                                                        #</label>
+                                                    <input type="text" id="so-number"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div class="col-span-1">
+                                                    <label for="ucid"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">UCID</label>
+                                                    <input type="text" id="ucid"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                            </div>
+                                            <h4 class="text-lg font-semibold mt-4 mb-2 border-b pb-1 text-teal-600">
+                                                Record Status</h4>
+                                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <label for="owner"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Owner</label>
+                                                    <input type="text" id="owner"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div>
+                                                    <label for="status"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                                                    <input type="text" id="status"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div>
+                                                    <label for="quote"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Quote</label>
+                                                    <input type="text" id="quote"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div>
+                                                    <label for="phase-0"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Phase
+                                                        0</label>
+                                                    <select id="phase-0"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                                        <option value="">-- Select --</option>
+                                                        <option value="Done">Done</option>
+                                                        <option value="NA Internal">NA Internal</option>
+                                                        <option value="Waiting">Waiting</option>
+                                                        <option value="Yes">Yes</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="hm-approval"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">HM
+                                                        approval</label>
+                                                    <select id="hm-approval"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                                                        <option value="">-- Select --</option>
+                                                        <option value="NA Internal">NA Internal</option>
+                                                        <option value="Not ok - ok now">Not ok - ok now</option>
+                                                        <option value="Not ok - working on it">Not ok - working on it
+                                                        </option>
+                                                        <option value="OK">OK</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="fin-request-date"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Fin request
+                                                        date</label>
+                                                    <input type="date" id="fin-request-date"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div>
+                                                    <label for="fin-approval-date"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Fin
+                                                        approval date</label>
+                                                    <input type="date" id="fin-approval-date"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div class="col-span-2">
+                                                    <label for="pre-exp-shipping"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Pre Exp
+                                                        Shipping</label>
+                                                    <input type="text" id="pre-exp-shipping"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                            </div>
+                                            <h4 class="text-lg font-semibold mt-4 mb-2 border-b pb-1 text-teal-600">Loan
+                                                Options</h4>
+                                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <label for="canada-flag"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Canada?</label>
+                                                    <select id="canada-flag"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                                                        <option value="No">No</option>
+                                                        <option value="Yes">Yes</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="reuse"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Reuse</label>
+                                                    <select id="reuse"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
+                                                        <option value="">-- Select --</option>
+                                                        <option value="Not Available">Not Available</option>
+                                                        <option value="Possible">Possible</option>
+                                                        <option value="Rejected">Rejected</option>
+                                                        <option value="Reuse Loan">Reuse Loan</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="license"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">License</label>
+                                                    <select id="license"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500">
+                                                        <option value="">-- Select --</option>
+                                                        <option value="Needed">Needed</option>
+                                                        <option value="Not Required">Not Required</option>
+                                                        <option value="Requested">Requested</option>
+                                                        <option value="Returned">Returned</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="installation"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Installation</label>
+                                                    <select id="installation"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                                                        <option value="">-- Select --</option>
+                                                        <option value="Needed">Needed</option>
+                                                        <option value="Not Required">Not Required</option>
+                                                        <option value="Requested">Requested</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <h4 class="text-lg font-semibold mt-4 mb-2 border-b pb-1 text-teal-600">Hold
+                                                and Other Data</h4>
+                                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <label for="holds"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Holds</label>
+                                                    <input type="text" id="holds"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div>
+                                                    <label for="hold-status"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">Hold
+                                                        status</label>
+                                                    <input type="text" id="hold-status"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                                <div class="col-span-2">
+                                                    <label for="p20"
+                                                        class="block text-xs font-medium text-gray-700 mb-1">P20</label>
+                                                    <input type="text" id="p20"
+                                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                                </div>
+                                            </div>
+
+                                            <div class="space-y-3 mt-6">
+                                                <button type="submit" id="submit-button" onclick="passToFollowUp(event)"
+                                                    class="w-full px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150">
+                                                    Save to Follow-up
+                                                </button>
+                                                <button type="button" id="cancel-edit-button" onclick="resetForm()"
+                                                    class="w-full px-4 py-3 bg-gray-200 text-gray-700 font-bold rounded-lg shadow-md hover:bg-gray-300 transition duration-150 hidden">
+                                                    Cancel Edit
+                                                </button>
+                                                <button type="button" id="notify-approver-btn"
+                                                    onclick="sendApprovalEmail()"
+                                                    class="w-full px-4 py-3 bg-purple-600 text-white font-bold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 hidden flex items-center justify-center">
+                                                    📧 Notify Approver
+                                                </button>
+                                            </div>
+                                        </form>
+
+                                    </div>
+                                </div>
+
+                                <div class="lg:col-span-1 space-y-6">
+                                    <div id="workflow-tracker" class="bg-white p-4 rounded-xl shadow-md">
+                                        <h4 class="text-base font-semibold text-gray-700 mb-3 border-b pb-2">Data Entry
+                                            Workflow</h4>
+                                        <div class="grid grid-cols-2 gap-3 text-sm">
+                                            <label class="flex items-center space-x-2">
+                                                <input type="checkbox" id="check-ngo-quote"
+                                                    onchange="saveWorkflowState()"
+                                                    class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                <span class="text-gray-700">NGQ Quote</span>
+                                            </label>
+                                            <label class="flex items-center space-x-2">
+                                                <input type="checkbox" id="check-ngo-converted"
+                                                    onchange="saveWorkflowState()"
+                                                    class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                <span class="text-gray-700">NGQC Converted</span>
+                                            </label>
+                                            <label class="flex items-center space-x-2">
+                                                <input type="checkbox" id="check-paste-quote"
+                                                    onchange="saveWorkflowState()"
+                                                    class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                <span class="text-gray-700">Paste Quote</span>
+                                            </label>
+                                            <label class="flex items-center space-x-2">
+                                                <input type="checkbox" id="check-click-all"
+                                                    onchange="saveWorkflowState()"
+                                                    class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                <span class="text-gray-700">Click All</span>
+                                            </label>
+                                            <label class="flex items-center space-x-2">
+                                                <input type="checkbox" id="check-prepare-cfg"
+                                                    onchange="saveWorkflowState()"
+                                                    class="form-checkbox h-4 w-4 text-indigo-600 rounded">
+                                                <span class="text-gray-700">Prepare CFG to SDFC</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-white p-4 rounded-xl shadow-md">
+                                        <label for="comments"
+                                            class="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                                        <textarea id="comments" rows="18"
+                                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982] resize-none"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tab-backlog" class="tab-pane hidden">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-2xl font-bold text-gray-800">Backlog (SO# Received)</h3>
+                                <div class="text-sm text-gray-500">
+                                    Records with SO# are automatically listed here.
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th scope="col"
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Customer / Product</th>
+                                                <th scope="col"
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    SO # / PO #</th>
+                                                <th scope="col"
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Dates Overview</th>
+                                                <th scope="col"
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Status</th>
+                                                <th scope="col"
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="backlog-table-body" class="bg-white divide-y divide-gray-200">
+                                            <!-- Rows rendered by JS -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="backlog-empty-state" class="p-8 text-center text-gray-500 italic hidden">
+                                    No records found with an assigned SO#.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tab-follow-up" class="tab-pane hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-2xl font-bold text-gray-800">Projects in Follow-up</h3>
+                            </div>
+                            <div id="follow-up-list" class="space-y-4">
+                                <p class="text-gray-500 italic p-4 bg-white rounded-lg shadow-md">No projects marked for
+                                    follow-up.</p>
+                            </div>
+                        </div>
+
+                        <div id="tab-history" class="tab-pane hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-2xl font-bold text-gray-800">Record History</h3>
+                                <div class="space-x-2 flex">
+                                    <button onclick="exportToCSV()"
+                                        class="px-4 py-2 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 transition duration-150 text-sm">
+                                        Export CSV
+                                    </button>
+                                    <button onclick="downloadBackupJSON()"
+                                        class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 text-sm flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                        Backup File
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Advanced Restore Section -->
+                            <div class="bg-white p-4 rounded-xl shadow-md mb-6 border-l-4 border-indigo-500">
+                                <h4 class="text-base font-bold text-gray-700 mb-3 border-b pb-2 flex justify-between">
+                                    <span>Backup & Restore Tools</span>
+                                    <span class="text-xs font-normal text-gray-500">JSON Format</span>
+                                </h4>
+
+                                <!-- Option A: File (Recommended) -->
+                                <div class="mb-4">
+                                    <p class="text-sm font-semibold text-gray-600 mb-2">Option A: Save/Load File
+                                        (Recommended)</p>
+                                    <div class="flex space-x-3">
+                                        <button onclick="downloadBackupJSON()"
+                                            class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100">Download
+                                            Backup File</button>
+                                        <label
+                                            class="cursor-pointer text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded border border-gray-300 hover:bg-gray-200 flex items-center">
+                                            <span>📂 Restore from File...</span>
+                                            <input type="file" class="hidden" accept=".json"
+                                                onchange="restoreBackupJSON(this)">
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Option B: Clipboard (Quick) -->
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-600 mb-2">Option B: Copy/Paste Text</p>
+                                    <div class="flex space-x-2">
+                                        <button onclick="exportJSON()"
+                                            class="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">Copy
+                                            Data</button>
+                                        <input type="text" id="import-json-area" placeholder="Paste JSON here..."
+                                            class="flex-grow p-1 border border-gray-300 rounded text-xs">
+                                        <button onclick="importFromJSON()"
+                                            class="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600">Import
+                                            Text</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <input type="text" id="history-search" oninput="renderRecords()"
+                                    placeholder="Search by Loan #, Customer, Product, Owner..."
+                                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982] shadow-sm">
+                            </div>
+                            <div id="records-list" class="space-y-4">
+                                <p class="text-gray-500 italic">Loading local data...</p>
+                            </div>
+                        </div>
+
+                        <div id="tab-support" class="tab-pane hidden">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4">Resources and Support Material</h3>
+
+                            <div class="bg-white p-4 rounded-xl shadow-md mb-6">
+                                <h4 class="text-base font-semibold text-gray-700 mb-3 border-b pb-2">
+                                    🔗 Help Links (Saved Locally)
+                                </h4>
+                                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
+                                    <input type="text" id="link-url-input" placeholder="https://..."
+                                        class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                    <input type="text" id="link-name-input" placeholder="Name (e.g., Approval Guide)"
+                                        class="sm:w-1/3 p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                    <button onclick="addSupportLink()"
+                                        class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 whitespace-nowrap">Add
+                                        Link</button>
+                                </div>
+                                <ul id="support-links-list" class="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                    <p class="text-gray-400 italic text-sm">No saved links.</p>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl shadow-md mb-6">
+                                <h4 class="text-base font-semibold text-gray-700 mb-3 border-b pb-2">
+                                    📄 Workflow Files (Saved Locally)
+                                </h4>
+                                <div class="flex space-x-2 mb-3">
+                                    <input type="text" id="file-name-input" placeholder="File Name (e.g., template.cfg)"
+                                        class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982]">
+                                    <button onclick="addSupportFile()"
+                                        class="px-4 py-2 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 transition duration-150 whitespace-nowrap">Add
+                                        File</button>
+                                </div>
+                                <ul id="support-files-list" class="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                    <p class="text-gray-400 italic text-sm">No saved files.</p>
+                                </ul>
+                            </div>
+
+                            <div id="support-material-section" class="bg-white p-4 rounded-xl shadow-md mb-6">
+                                <h4 class="text-base font-semibold text-gray-700 mb-3 border-b pb-2">Support Material
+                                    (Process Notes)</h4>
+                                <p class="text-xs text-gray-3000 mb-2">These notes are saved automatically in your
+                                    browser for general reference.</p>
+                                <textarea id="support-notes-area" rows="10"
+                                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-[#01A982] focus:border-[#01A982] resize-none"
+                                    placeholder="Write your notes, reminders, or key process steps here..."
+                                    oninput="saveSupportNotes()">
+                                </textarea>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Backlog Edit Modal -->
+        <div id="backlog-modal"
+            class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all scale-100">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800" id="backlog-modal-title">Backlog Management</h3>
+                        <p class="text-sm text-gray-500" id="backlog-modal-subtitle">Update production status</p>
+                    </div>
+                    <button onclick="closeBacklogModal()" class="text-gray-400 hover:text-gray-600 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="backlog-form" onsubmit="saveBacklogUpdate(event)">
+                    <input type="hidden" id="backlog-record-id">
+                    <div class="p-6 space-y-6">
+                        <!-- Key Info (Read Only) -->
+                        <div class="grid grid-cols-2 gap-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                            <div>
+                                <span class="block text-xs text-blue-600 font-semibold uppercase">Customer</span>
+                                <span class="block text-sm font-bold text-gray-900" id="bl-display-customer">-</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-blue-600 font-semibold uppercase">Product</span>
+                                <span class="block text-sm font-bold text-gray-900" id="bl-display-product">-</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-blue-600 font-semibold uppercase">SO #</span>
+                                <span class="block text-sm font-bold text-gray-900" id="bl-display-so">-</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-blue-600 font-semibold uppercase">Loan #</span>
+                                <span class="block text-sm font-bold text-gray-900" id="bl-display-loan">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Status & Dates -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Production Status</label>
+                                <select id="bl-status"
+                                    class="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 bg-white">
+                                    <option value="Pending Production">Pending Production ⏳</option>
+                                    <option value="In Production">In Production 🔨</option>
+                                    <option value="Quality Check">Quality Check 🔍</option>
+                                    <option value="Ready for Shipping">Ready for Shipping 📦</option>
+                                    <option value="Shipped">Shipped 🚚</option>
+                                    <option value="Delivered">Delivered ✅</option>
+                                    <option value="Delayed">Delayed ⚠️</option>
+                                    <option value="On Hold">On Hold 🛑</option>
+                                </select>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-500">Order Received Date</label>
+                                    <input type="date" id="bl-date-received"
+                                        class="w-full p-2 border border-gray-300 rounded text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-500">Order Entry Date</label>
+                                    <input type="date" id="bl-date-entry"
+                                        class="w-full p-2 border border-gray-300 rounded text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-500">Customer Req. Date</label>
+                                    <input type="date" id="bl-date-req"
+                                        class="w-full p-2 border border-gray-300 rounded text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Production Log / Tracking
+                                Notes</label>
+                            <textarea id="bl-notes" rows="4"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 text-sm"
+                                placeholder="e.g. Unit left factory, tracking #12345..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
+                        <button type="button" onclick="closeBacklogModal()"
+                            class="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition">Cancel</button>
+                        <button type="submit"
+                            class="px-5 py-2.5 bg-orange-600 text-white font-bold rounded-lg hover:bg-orange-700 shadow-lg transition">Save
+                            Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- LOCAL STORAGE KEYS ---
+        const LOCAL_STORAGE_KEY = 'project_tracker_records';
+        const WORKFLOW_STATE_KEY = 'workflow_tracker_state';
+        const SUPPORT_NOTES_KEY = 'support_notes_data';
+        const SUPPORT_LINKS_KEY = 'support_links_data';
+        const SUPPORT_FILES_KEY = 'support_files_data';
+        const TASKS_STORAGE_KEY = 'project_tracker_tasks';
+
+        // Global data array
+        let dataRecords = [];
+        let workflowState = {};
+        let supportLinks = [];
+        let supportFiles = [];
+        let tasks = [];
+
+        // Form elements mapping
+        const recordForm = document.getElementById('record-form');
+        const recordIdInput = document.getElementById('record-id');
+
+        // Input/Date/Textarea Fields
+        const fields = {
+            loanNumber: document.getElementById('loan-number'),
+            customer: document.getElementById('customer'), // NUEVO
+            product: document.getElementById('product'),   // NUEVO
+            date: document.getElementById('date'),
+            owner: document.getElementById('owner'),
+            status: document.getElementById('status'),
+            quote: document.getElementById('quote'),
+            soNumber: document.getElementById('so-number'),
+            ucid: document.getElementById('ucid'),
+            p20: document.getElementById('p20'),
+            preExpShipping: document.getElementById('pre-exp-shipping'),
+            holds: document.getElementById('holds'),
+            holdStatus: document.getElementById('hold-status'),
+            finRequestDate: document.getElementById('fin-request-date'),
+            finApprovalDate: document.getElementById('fin-approval-date'),
+            comments: document.getElementById('comments'),
+            internalFlag: document.getElementById('internal-flag')
+        };
+
+        // Select (Dropdown) Fields
+        const selectFields = {
+            canadaFlag: document.getElementById('canada-flag'),
+            reuse: document.getElementById('reuse'),
+            phase0: document.getElementById('phase-0'),
+            hmApproval: document.getElementById('hm-approval'),
+            license: document.getElementById('license'),
+            installation: document.getElementById('installation'),
+        };
+
+        // Workflow Checkbox IDs
+        const workflowCheckboxes = [
+            'check-ngo-quote',
+            'check-ngo-converted',
+            'check-paste-quote',
+            'check-click-all',
+            'check-prepare-cfg'
+        ];
+
+        // Other elements
+        const submitButton = document.getElementById('submit-button');
+        const cancelButton = document.getElementById('cancel-edit-button');
+        const formTitle = document.getElementById('form-title');
+        const recordsList = document.getElementById('records-list');
+        const followUpList = document.getElementById('follow-up-list');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const followUpCountBadge = document.getElementById('follow-up-count-badge');
+        const historySearchInput = document.getElementById('history-search');
+        const importJsonArea = document.getElementById('import-json-area');
+        const notifyApproverBtn = document.getElementById('notify-approver-btn'); // NUEVO BOTON
+
+        // --- Utility for CSV Escaping ---
+        function escapeCsv(value) {
+            if (value === null || value === undefined) return '';
+            const str = String(value).replace(/\r/g, '');
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }
+
+        // --- TASK MANAGER LOGIC ---
+        function loadTasks() {
+            try {
+                const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+                tasks = storedTasks ? JSON.parse(storedTasks) : [];
+            } catch (e) {
+                console.error("Error loading tasks", e);
+                tasks = [];
+            }
+            renderTasks();
+        }
+
+        function saveTasks() {
+            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+            renderTasks();
+        }
+
+        window.addTask = function (e) {
+            e.preventDefault();
+            const desc = document.getElementById('task-desc').value.trim();
+            const loan = document.getElementById('task-loan').value.trim();
+            const priority = document.getElementById('task-priority').value;
+            const due = document.getElementById('task-due').value;
+
+            // Get selected context
+            const contextOptions = document.getElementsByName('task-context');
+            let context = 'general';
+            for (let opt of contextOptions) { if (opt.checked) context = opt.value; }
+
+            if (!desc) return;
+
+            const newTask = {
+                id: Date.now().toString(),
+                desc,
+                loan,
+                priority,
+                due,
+                context, // Saved Context
+                createdAt: Date.now(),
+                completed: false,
+                completedAt: null
+            };
+
+            tasks.unshift(newTask); // Add to top
+            saveTasks();
+
+            // Reset form
+            document.getElementById('task-form').reset();
+            document.getElementById('task-priority').value = "Medium";
+        }
+
+        window.toggleTask = function (id) {
+            const taskIndex = tasks.findIndex(t => t.id === id);
+            if (taskIndex > -1) {
+                tasks[taskIndex].completed = !tasks[taskIndex].completed;
+                tasks[taskIndex].completedAt = tasks[taskIndex].completed ? Date.now() : null;
+                saveTasks();
+            }
+        }
+
+        window.deleteTask = function (id) {
+            if (confirm('Delete this task?')) {
+                tasks = tasks.filter(t => t.id !== id);
+                saveTasks();
+            }
+        }
+
+        window.clearCompletedTasks = function () {
+            if (confirm('Remove all completed tasks from history?')) {
+                tasks = tasks.filter(t => !t.completed);
+                saveTasks();
+            }
+        }
+
+        // BUSQUEDA INTELIGENTE DEL LOAN
+        window.openLoanFromTask = function (loanNum, context = 'general') {
+            if (!loanNum) return;
+            const target = loanNum.trim().toLowerCase();
+
+            const record = dataRecords.find(r => {
+                if (!r.loanNumber) return false;
+                const dbLoan = r.loanNumber.trim().toLowerCase();
+                return dbLoan === target || dbLoan.endsWith(target) || target.endsWith(dbLoan);
+            });
+
+            if (record) {
+                // Context-Aware Navigation
+                if (context === 'backlog') {
+                    // Go to Backlog -> Open Modal
+                    switchTab('backlog');
+                    openBacklogEdit(record.id);
+                } else if (context === 'follow-up') {
+                    // Go to Data Entry -> Open Form
+                    editRecord(record.id, 'tasks');
+                } else {
+                    // Default behavior
+                    editRecord(record.id, 'tasks');
+                }
+            } else {
+                if (confirm(`Loan #${loanNum} not found in records.\n\nDo you want to create a NEW project for Loan #${loanNum} now?`)) {
+                    switchTab('data-entry');
+                    resetForm();
+                    document.getElementById('loan-number').value = loanNum; // Pre-llenar el Loan #
+                }
+            }
+        }
+
+        function getPriorityColor(priority) {
+            switch (priority) {
+                case 'High': return 'bg-red-100 text-red-800 border-red-200';
+                case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                case 'Low': return 'bg-blue-50 text-blue-800 border-blue-100';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function renderTasks() {
+            const pendingList = document.getElementById('pending-tasks-list');
+            const completedList = document.getElementById('completed-tasks-list');
+            const badge = document.getElementById('pending-tasks-badge');
+            const countDisplay = document.getElementById('task-count-display');
+
+            if (!pendingList) return;
+
+            const priorityWeight = { 'High': 3, 'Medium': 2, 'Low': 1 };
+
+            // Render Pending with Context
+            const pendingTasks = tasks.filter(t => !t.completed).sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
+            const completedTasks = tasks.filter(t => t.completed).sort((a, b) => b.completedAt - a.completedAt);
+
+            // Update Badge
+            if (pendingTasks.length > 0) {
+                badge.textContent = pendingTasks.length;
+                badge.classList.remove('hidden');
+                countDisplay.textContent = `(${pendingTasks.length})`;
+            } else {
+                badge.classList.add('hidden');
+                countDisplay.textContent = "(0)";
+            }
+
+            if (pendingTasks.length === 0) {
+                pendingList.innerHTML = '<p class="text-gray-400 italic text-sm p-4 text-center border-2 border-dashed border-gray-200 rounded-lg">No pending tasks. Time for a coffee! ☕</p>';
+            } else {
+                pendingList.innerHTML = pendingTasks.map(t => {
+                    // Context Badge Logic
+                    let contextBadge = '';
+                    let btnColor = 'bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-200';
+
+                    if (t.context === 'backlog') {
+                        contextBadge = '<span class="text-[10px] uppercase font-bold text-orange-600 bg-orange-100 px-1 rounded ml-2">Backlog</span>';
+                        btnColor = 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200';
+                    } else if (t.context === 'follow-up') {
+                        contextBadge = '<span class="text-[10px] uppercase font-bold text-teal-600 bg-teal-100 px-1 rounded ml-2">Follow-up</span>';
+                        btnColor = 'bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-200';
+                    }
+
+                    return `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 ${t.priority === 'High' ? 'border-red-500' : (t.priority === 'Medium' ? 'border-yellow-500' : 'border-blue-400')} flex justify-between items-start transition hover:shadow-md">
+                        <div class="flex-grow">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded ${getPriorityColor(t.priority)}">${t.priority}</span>
+                                ${contextBadge}
+                                ${t.loan ? `<button onclick="openLoanFromTask('${t.loan}', '${t.context || 'general'}')" class="text-xs font-mono ml-2 ${btnColor} border px-2 py-0.5 rounded transition cursor-pointer" title="Go to Project">Loan #${t.loan} ↗</button>` : ''}
+                                ${t.due ? `<span class="text-xs text-gray-500 flex items-center ml-2">📅 ${t.due}</span>` : ''}
+                            </div>
+                            <p class="text-gray-800 font-medium whitespace-pre-wrap">${t.desc}</p>
+                            <p class="text-xs text-gray-400 mt-1">Created: ${new Date(t.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div class="flex flex-col space-y-2 ml-4">
+                            <button onclick="toggleTask('${t.id}')" class="text-green-500 hover:bg-green-50 p-1 rounded" title="Mark Done">✅</button>
+                            <button onclick="deleteTask('${t.id}')" class="text-red-400 hover:bg-red-50 p-1 rounded" title="Delete">🗑️</button>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+
+            // Render Completed
+            if (completedTasks.length === 0) {
+                completedList.innerHTML = '';
+            } else {
+                completedList.innerHTML = completedTasks.map(t => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-100">
+                        <div class="flex items-center">
+                            <button onclick="toggleTask('${t.id}')" class="mr-3 text-gray-400 hover:text-green-600" title="Undo">↩️</button>
+                            <div>
+                                <p class="text-gray-500 line-through text-sm">${t.desc}</p>
+                                ${t.loan ? `<span class="text-xs text-gray-400">Loan #${t.loan}</span>` : ''}
+                            </div>
+                        </div>
+                        <button onclick="deleteTask('${t.id}')" class="text-gray-300 hover:text-red-500 ml-2">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- LOCAL STORAGE CRUD (Records) ---
+
+        function loadSupportNotes() {
+            try {
+                const storedNotes = localStorage.getItem(SUPPORT_NOTES_KEY);
+                const notesArea = document.getElementById('support-notes-area');
+                if (storedNotes && notesArea) {
+                    notesArea.value = storedNotes;
+                }
+            } catch (e) {
+                console.error("Error loading support notes:", e);
+            }
+        }
+
+        window.saveSupportNotes = function () {
+            try {
+                const notesArea = document.getElementById('support-notes-area');
+                if (notesArea) {
+                    localStorage.setItem(SUPPORT_NOTES_KEY, notesArea.value);
+                }
+            } catch (e) {
+                console.error("Error saving support notes:", e);
+            }
+        }
+
+        // --- Links & Files Functions (Omitted for brevity, logic identical to previous) ---
+        function loadSupportLinks() {
+            try {
+                const storedData = localStorage.getItem(SUPPORT_LINKS_KEY);
+                supportLinks = storedData ? JSON.parse(storedData) : [];
+            } catch (e) { supportLinks = []; }
+        }
+        function saveSupportLinks() {
+            localStorage.setItem(SUPPORT_LINKS_KEY, JSON.stringify(supportLinks));
+        }
+        function renderSupportLinks() {
+            const listElement = document.getElementById('support-links-list');
+            if (!listElement) return;
+            if (supportLinks.length === 0) {
+                listElement.innerHTML = '<p class="text-gray-400 italic text-sm">No saved links.</p>';
+                return;
+            }
+            listElement.innerHTML = supportLinks.map(link => `
+                <li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg animate-fade-in">
+                    <a href="${link.url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-sm truncate" title="${link.url}">${link.name}</a>
+                    <button onclick="deleteSupportLink('${link.id}')" class="ml-4 px-2 py-0.5 text-red-500 hover:bg-red-100 rounded text-xs font-semibold">DELETE</button>
+                </li>
+            `).join('');
+        }
+        window.addSupportLink = function () {
+            const urlInput = document.getElementById('link-url-input');
+            const nameInput = document.getElementById('link-name-input');
+            let url = urlInput.value.trim();
+            const name = nameInput.value.trim();
+            if (!url || !name) { alert('Enter URL and Name'); return; }
+            if (!url.startsWith('http')) url = 'https://' + url;
+            supportLinks.push({ id: Date.now().toString(), url: url, name: name });
+            saveSupportLinks(); renderSupportLinks();
+            urlInput.value = ''; nameInput.value = '';
+        }
+        window.deleteSupportLink = function (id) {
+            if (confirm('Delete link?')) { supportLinks = supportLinks.filter(l => l.id !== id); saveSupportLinks(); renderSupportLinks(); }
+        }
+        // ... (Files logic identical to Links, simplified here for space but fully working in logic above) ...
+        function loadSupportFiles() {
+            try { supportFiles = JSON.parse(localStorage.getItem(SUPPORT_FILES_KEY) || '[]'); } catch (e) { supportFiles = []; }
+        }
+        function saveSupportFiles() { localStorage.setItem(SUPPORT_FILES_KEY, JSON.stringify(supportFiles)); }
+        function renderSupportFiles() {
+            const list = document.getElementById('support-files-list');
+            if (!list) return;
+            if (supportFiles.length === 0) { list.innerHTML = '<p class="text-gray-400 italic text-sm">No saved files.</p>'; return; }
+            list.innerHTML = supportFiles.map(f => `<li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg"><span class="font-mono text-sm">${f.name}</span><button onclick="deleteSupportFile('${f.id}')" class="ml-4 px-2 text-red-500 hover:bg-red-100 text-xs font-bold rounded">DELETE</button></li>`).join('');
+        }
+        window.addSupportFile = function () {
+            const i = document.getElementById('file-name-input');
+            if (!i.value.trim()) return;
+            supportFiles.push({ id: Date.now().toString(), name: i.value.trim() });
+            saveSupportFiles(); renderSupportFiles(); i.value = '';
+        }
+        window.deleteSupportFile = function (id) {
+            if (confirm('Delete file name?')) { supportFiles = supportFiles.filter(f => f.id !== id); saveSupportFiles(); renderSupportFiles(); }
+        }
+
+
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        }
+
+        function loadRecordsFromLocal() {
+            try {
+                const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (storedData) {
+                    dataRecords = JSON.parse(storedData);
+                    dataRecords.sort((a, b) => b.createdAt - a.createdAt);
+                } else {
+                    dataRecords = [];
+                }
+            } catch (e) {
+                console.error("Error loading data from localStorage:", e);
+                dataRecords = [];
+            }
+            renderRecords();
+            renderFollowUpList();
+            renderBacklog();
+        }
+
+        function saveRecordsToLocal() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataRecords));
+            } catch (e) {
+                console.error("Error saving data to localStorage:", e);
+            }
+        }
+
+        async function saveRecord(recordData, recordId = null, newStatus = 'history') {
+            if (recordId) {
+                // UPDATE
+                const index = dataRecords.findIndex(r => r.id === recordId);
+                if (index !== -1) {
+                    dataRecords[index] = {
+                        ...dataRecords[index],
+                        ...recordData,
+                        updatedAt: Date.now(),
+                        status: newStatus
+                    };
+                    if (newStatus === 'history' && dataRecords[index].isCompleted !== true) {
+                        dataRecords[index].isCompleted = true;
+                        dataRecords[index].completedAt = Date.now();
+                    }
+                }
+            } else {
+                // CREATE
+                const newRecord = {
+                    ...recordData,
+                    id: generateUniqueId(),
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    isCompleted: (newStatus === 'history'),
+                    status: newStatus,
+                    completedAt: (newStatus === 'history' ? Date.now() : null)
+                };
+                dataRecords.unshift(newRecord);
+            }
+
+            saveRecordsToLocal();
+            loadRecordsFromLocal();
+            return true;
+        }
+
+        async function deleteRecord(recordId) {
+            if (confirm('Are you sure you want to delete this record?')) {
+                dataRecords = dataRecords.filter(r => r.id !== recordId);
+                saveRecordsToLocal();
+                loadRecordsFromLocal();
+                resetForm();
+                return true;
+            }
+            return false;
+        }
+
+        async function toggleComplete(recordId, currentStatus) {
+            const index = dataRecords.findIndex(r => r.id === recordId);
+            if (index !== -1) {
+                dataRecords[index].isCompleted = !currentStatus;
+                dataRecords[index].status = !currentStatus ? 'history' : 'follow-up';
+                dataRecords[index].completedAt = !currentStatus ? Date.now() : null;
+                saveRecordsToLocal();
+                loadRecordsFromLocal();
+            }
+        }
+
+        // --- WORKFLOW STATE ---
+        function loadWorkflowState() {
+            try {
+                workflowState = JSON.parse(localStorage.getItem(WORKFLOW_STATE_KEY) || '{}');
+            } catch (e) { workflowState = {}; }
+            workflowCheckboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) checkbox.checked = !!workflowState[id];
+            });
+        }
+        window.saveWorkflowState = function () {
+            workflowCheckboxes.forEach(id => {
+                const c = document.getElementById(id);
+                if (c) workflowState[id] = c.checked;
+            });
+            localStorage.setItem(WORKFLOW_STATE_KEY, JSON.stringify(workflowState));
+        }
+        function resetWorkflowCheckboxes() {
+            workflowCheckboxes.forEach(id => {
+                const c = document.getElementById(id);
+                if (c) c.checked = false;
+            });
+            saveWorkflowState();
+        }
+
+        // --- CSV Export Logic ---
+        function exportToCSV(mode) {
+            if (dataRecords.length === 0) {
+                if (mode !== 'auto') {
+                    alert("No saved records to export.");
+                }
+                return;
+            }
+            // Agregados 'customer' y 'product'
+            const explicitHeaders = [
+                'id', 'loanNumber', 'customer', 'product', 'date', 'owner', 'status', 'quote', 'soNumber', 'ucid', 'p20', 'preExpShipping',
+                'holds', 'holdStatus', 'finRequestDate', 'finApprovalDate', 'canadaFlag', 'reuse', 'phase0',
+                'hmApproval', 'license', 'installation', 'comments', 'isCompleted', 'status_type', 'createdAt', 'updatedAt', 'completedAt'
+            ];
+            const csvRows = [];
+            csvRows.push(explicitHeaders.map(h => escapeCsv(h)).join(','));
+            dataRecords.forEach(record => {
+                const values = explicitHeaders.map(header => escapeCsv(record[header] || ''));
+                csvRows.push(values.join(','));
+            });
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', (mode === 'auto') ? 'PROJECT_BACKUP_AUTO.csv' : 'project_data_export_' + Date.now() + '.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                if (mode !== 'auto') alert("Export Successful!");
+            } else {
+                if (mode !== 'auto') {
+                    const w = window.open("");
+                    w.document.write("<textarea style='width:100%;height:100%'>" + csvString + "</textarea>");
+                }
+            }
+        }
+        window.exportToCSV = exportToCSV;
+
+        // --- FILE BACKUP SYSTEM (Robust) ---
+        window.downloadBackupJSON = function () {
+            const backupData = {
+                timestamp: Date.now(),
+                version: "2.2",
+                records: dataRecords,
+                workflow: workflowState,
+                tasks: tasks, // Include Tasks
+                supportNotes: localStorage.getItem(SUPPORT_NOTES_KEY),
+                supportLinks: supportLinks,
+                supportFiles: supportFiles
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+            const link = document.createElement('a');
+            link.setAttribute("href", dataStr);
+            link.setAttribute("download", "tracker_backup_v2_" + new Date().toISOString().slice(0, 10) + ".json");
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        window.restoreBackupJSON = function (inputElement) {
+            const file = inputElement.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const content = JSON.parse(e.target.result);
+                    // Support both old structure (just records) and new full structure
+                    const newRecords = content.records || (Array.isArray(content) ? content : null);
+
+                    if (!newRecords) { alert("Invalid backup file."); return; }
+
+                    if (confirm(`Restore ${newRecords.length} records and all data from backup?\n\nCURRENT DATA WILL BE REPLACED.`)) {
+                        dataRecords = newRecords;
+                        if (content.workflow) workflowState = content.workflow;
+                        if (content.tasks) tasks = content.tasks;
+                        if (content.supportNotes) localStorage.setItem(SUPPORT_NOTES_KEY, content.supportNotes);
+                        if (content.supportLinks) supportLinks = content.supportLinks;
+                        if (content.supportFiles) supportFiles = content.supportFiles;
+
+                        saveRecordsToLocal();
+                        localStorage.setItem(WORKFLOW_STATE_KEY, JSON.stringify(workflowState));
+                        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+                        saveSupportLinks();
+                        saveSupportFiles();
+
+                        // Refresh All
+                        loadRecordsFromLocal();
+                        loadWorkflowState();
+                        loadTasks();
+                        loadSupportNotes();
+                        renderSupportLinks();
+                        renderSupportFiles();
+
+                        alert("Full Restore Successful!");
+                        switchTab('history');
+                    }
+                } catch (err) { alert("Error reading file: " + err.message); }
+                inputElement.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- JSON Export/Import Logic (Clipboard) ---
+        window.copyToClipboard = function (text) {
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("JSON copied to clipboard!");
+        };
+        window.exportJSON = function () {
+            if (dataRecords.length === 0) { alert("No records."); return; }
+            window.copyToClipboard(localStorage.getItem(LOCAL_STORAGE_KEY));
+        };
+        window.importFromJSON = function () {
+            const txt = importJsonArea.value.trim();
+            if (!txt) return;
+            try {
+                const recs = JSON.parse(txt);
+                if (Array.isArray(recs) && confirm(`Replace current records with ${recs.length} imported records?`)) {
+                    localStorage.setItem(LOCAL_STORAGE_KEY, txt);
+                    loadRecordsFromLocal();
+                    importJsonArea.value = '';
+                    switchTab('history');
+                }
+            } catch (e) { alert("Invalid JSON"); }
+        };
+
+
+        // --- Utility Function for Milestone Colors ---
+
+        function getMilestoneBadge(value, type) {
+            if (!value || value === '' || value === 'No') return `<span class="text-gray-500 text-xs">${value || 'N/A'}</span>`;
+            let color = 'bg-gray-200 text-gray-800';
+            switch (type) {
+                case 'canadaFlag': color = value === 'Yes' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'; break;
+                case 'reuse': if (value === 'Reuse Loan') color = 'bg-teal-500 text-white'; else if (value === 'Possible') color = 'bg-yellow-400 text-gray-900'; else if (value.includes('Reject') || value.includes('Not')) color = 'bg-red-600 text-white'; break;
+                case 'phase0': if (value === 'Done' || value === 'Yes') color = 'bg-green-500 text-white'; else if (value === 'Waiting') color = 'bg-yellow-400 text-gray-900'; else if (value === 'NA Internal') color = 'bg-blue-400 text-white'; break;
+                case 'hmApproval': if (value === 'OK') color = 'bg-green-600 text-white'; else if (value.includes('Not ok')) color = 'bg-orange-400 text-gray-900'; else if (value === 'NA Internal') color = 'bg-gray-400 text-white'; break;
+                case 'license': case 'installation': if (value === 'Needed' || value === 'Requested') color = 'bg-indigo-500 text-white'; else if (value === 'Returned') color = 'bg-green-500 text-white'; break;
+            }
+            return `<span class="milestone-badge ${color}">${value}</span>`;
+        }
+
+        function renderWorkflowBadges(snapshot) {
+            if (!snapshot) return '';
+            const workflowLabels = {
+                'check-ngo-quote': { label: 'NGQ Quote', color: 'bg-blue-500 text-white' },
+                'check-ngo-converted': { label: 'NGQC Converted', color: 'bg-green-500 text-white' },
+                'check-paste-quote': { label: 'Paste Quote', color: 'bg-yellow-400 text-gray-900' },
+                'check-click-all': { label: 'Click All', color: 'bg-purple-500 text-white' },
+                'check-prepare-cfg': { label: 'Prepare CFG', color: 'bg-indigo-500 text-white' }
+            };
+            let html = '';
+            workflowCheckboxes.forEach(id => {
+                if (snapshot[id] === true) {
+                    const config = workflowLabels[id];
+                    if (config) html += `<p><strong>${config.label}:</strong> <span class="milestone-badge ${config.color}">Yes</span></p>`;
+                }
+            });
+            if (!html) return '';
+            return `<div class="col-span-2 border-t mt-2 pt-2"><p class="font-semibold mb-1">Saved Workflow:</p><div class="grid grid-cols-2 gap-x-2 gap-y-1">${html}</div></div>`;
+        }
+
+        // --- Form Logic ---
+
+        window.applyInternalDefaults = function () {
+            const isInternal = fields.internalFlag.checked;
+            if (isInternal) {
+                fields.owner.value = 'Angel';
+                fields.status.value = 'Open';
+                selectFields.phase0.value = 'NA Internal';
+                selectFields.hmApproval.value = 'NA Internal';
+                selectFields.reuse.value = 'Not Available';
+                selectFields.installation.value = 'Not Required';
+            } else {
+                if (fields.owner.value === 'Angel') fields.owner.value = '';
+                if (fields.status.value === 'Open') fields.status.value = '';
+                if (selectFields.phase0.value === 'NA Internal') selectFields.phase0.value = '';
+                if (selectFields.hmApproval.value === 'NA Internal') selectFields.hmApproval.value = '';
+                if (selectFields.reuse.value === 'Not Available') selectFields.reuse.value = '';
+                if (selectFields.installation.value === 'Not Required') selectFields.installation.value = '';
+            }
+        }
+
+        // --- NOTIFY APPROVER FEATURE ---
+        window.sendApprovalEmail = function () {
+            const loanNum = fields.loanNumber.value.trim();
+            if (!loanNum) {
+                alert("Please ensure a Loan number is entered.");
+                return;
+            }
+
+            const subject = `Approval Request - Loan: ${loanNum}`;
+            const body = `Hi XXXXX,
+
+I hope you are well, a pleasure to greet you.
+I sent you the Loan: ${loanNum} for approval, you could help me validate it.
+
+Thanks.`;
+
+            const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.location.href = mailtoLink;
+        }
+
+        recordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            window.passToFollowUp(e);
+        });
+
+        window.passToFollowUp = async function (e) {
+            if (e && e.preventDefault) e.preventDefault();
+            if (!recordForm.checkValidity()) { recordForm.reportValidity(); return; }
+
+            const recordId = recordIdInput.value || null;
+            const workflowSnapshot = {};
+            workflowCheckboxes.forEach(id => { workflowSnapshot[id] = document.getElementById(id).checked; });
+
+            const recordData = {
+                loanNumber: fields.loanNumber.value.trim(),
+                customer: fields.customer.value.trim(), // GUARDAR CLIENTE
+                product: fields.product.value.trim(),   // GUARDAR PRODUCTO
+                date: fields.date.value,
+                owner: fields.owner.value.trim(),
+                status: fields.status.value.trim(),
+                quote: fields.quote.value.trim(),
+                soNumber: fields.soNumber.value.trim(),
+                ucid: fields.ucid.value.trim(),
+                p20: fields.p20.value.trim(),
+                preExpShipping: fields.preExpShipping.value.trim(),
+                holds: fields.holds.value.trim(),
+                holdStatus: fields.holdStatus.value.trim(),
+                finRequestDate: fields.finRequestDate.value,
+                finApprovalDate: fields.finApprovalDate.value,
+                internalFlag: fields.internalFlag.checked,
+                comments: fields.comments.value.trim(),
+                canadaFlag: selectFields.canadaFlag.value,
+                reuse: selectFields.reuse.value,
+                phase0: selectFields.phase0.value,
+                hmApproval: selectFields.hmApproval.value,
+                license: selectFields.license.value,
+                installation: selectFields.installation.value,
+                workflowSnapshot: workflowSnapshot
+            };
+
+            const success = await saveRecord(recordData, recordId, 'follow-up');
+            if (success) { resetForm(); switchTab('follow-up'); }
+        }
+
+        window.updateRecordFromEdit = async function () {
+            if (!recordForm.checkValidity()) { recordForm.reportValidity(); return; }
+            const recordId = recordIdInput.value;
+            const originalRecord = dataRecords.find(r => r.id === recordId);
+            if (!originalRecord) return;
+
+            const workflowSnapshot = {};
+            workflowCheckboxes.forEach(id => { workflowSnapshot[id] = document.getElementById(id).checked; });
+
+            const recordData = {
+                loanNumber: fields.loanNumber.value.trim(),
+                customer: fields.customer.value.trim(), // ACTUALIZAR CLIENTE
+                product: fields.product.value.trim(),   // ACTUALIZAR PRODUCTO
+                date: fields.date.value,
+                owner: fields.owner.value.trim(),
+                status: fields.status.value.trim(),
+                quote: fields.quote.value.trim(),
+                soNumber: fields.soNumber.value.trim(),
+                ucid: fields.ucid.value.trim(),
+                p20: fields.p20.value.trim(),
+                preExpShipping: fields.preExpShipping.value.trim(),
+                holds: fields.holds.value.trim(),
+                holdStatus: fields.holdStatus.value.trim(),
+                finRequestDate: fields.finRequestDate.value,
+                finApprovalDate: fields.finApprovalDate.value,
+                internalFlag: fields.internalFlag.checked,
+                comments: fields.comments.value.trim(),
+                canadaFlag: selectFields.canadaFlag.value,
+                reuse: selectFields.reuse.value,
+                phase0: selectFields.phase0.value,
+                hmApproval: selectFields.hmApproval.value,
+                license: selectFields.license.value,
+                installation: selectFields.installation.value,
+                workflowSnapshot: workflowSnapshot
+            };
+
+            const success = await saveRecord(recordData, recordId, originalRecord.status);
+            if (success) { resetForm(); switchTab(originalRecord.status); }
+        }
+
+        function resetForm() {
+            recordForm.reset();
+            recordIdInput.value = '';
+            fields.comments.value = '';
+            fields.internalFlag.checked = false;
+            resetWorkflowCheckboxes();
+            formTitle.textContent = 'Entry/Edit Project';
+            submitButton.textContent = 'Save to Follow-up';
+            submitButton.onclick = passToFollowUp;
+            cancelButton.classList.add('hidden');
+            if (notifyApproverBtn) notifyApproverBtn.classList.add('hidden');
+        }
+
+        window.switchTab = function (tabId) {
+            document.querySelectorAll('.tab-pane').forEach(pane => { pane.classList.add('hidden'); });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'border-teal-500', 'text-teal-500');
+                btn.classList.add('text-gray-500', 'border-transparent', 'hover:text-teal-600', 'hover:border-gray-200');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            activeBtn.classList.add('active', 'border-teal-500', 'text-teal-500');
+            activeBtn.classList.remove('text-gray-500', 'border-transparent', 'hover:text-teal-600', 'hover:border-gray-200');
+
+            if (tabId === 'history') { renderRecords(); }
+            else if (tabId === 'follow-up') { renderFollowUpList(); }
+            else if (tabId === 'tasks') { renderTasks(); }
+            else if (tabId === 'backlog') { renderBacklog(); }
+        }
+
+        // --- UI Rendering ---
+        window.editRecord = function (recordId, status) {
+            const record = dataRecords.find(r => r.id === recordId);
+            if (!record) return;
+
+            switchTab('data-entry');
+
+            recordIdInput.value = record.id;
+            formTitle.textContent = 'Editing Project: ' + (record.loanNumber || record.id.substring(0, 8));
+            cancelButton.classList.remove('hidden');
+            submitButton.textContent = 'Update Follow-up (Drafts)';
+            submitButton.onclick = updateRecordFromEdit;
+
+            if (notifyApproverBtn && status === 'follow-up') {
+                notifyApproverBtn.classList.remove('hidden');
+            } else if (notifyApproverBtn) {
+                notifyApproverBtn.classList.add('hidden');
+            }
+
+            fields.loanNumber.value = record.loanNumber || '';
+            fields.customer.value = record.customer || ''; // CARGAR CLIENTE
+            fields.product.value = record.product || '';   // CARGAR PRODUCTO
+            fields.date.value = record.date || '';
+            fields.owner.value = record.owner || '';
+            fields.status.value = record.status || '';
+            fields.quote.value = record.quote || '';
+            fields.soNumber.value = record.soNumber || '';
+            fields.ucid.value = record.ucid || '';
+            fields.p20.value = record.p20 || '';
+            fields.preExpShipping.value = record.preExpShipping || '';
+            fields.holds.value = record.holds || '';
+            fields.holdStatus.value = record.holdStatus || '';
+            fields.finRequestDate.value = record.finRequestDate || '';
+            fields.finApprovalDate.value = record.finApprovalDate || '';
+            fields.internalFlag.checked = record.internalFlag || false;
+            fields.comments.value = record.comments || '';
+
+            selectFields.canadaFlag.value = record.canadaFlag || 'No';
+            selectFields.reuse.value = record.reuse || '';
+            selectFields.phase0.value = record.phase0 || '';
+            selectFields.hmApproval.value = record.hmApproval || '';
+            selectFields.license.value = record.license || '';
+            selectFields.installation.value = record.installation || '';
+
+            // RESTORE WORKFLOW CHECKBOXES
+            workflowCheckboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) {
+                    checkbox.checked = (record.workflowSnapshot && record.workflowSnapshot[id] === true);
+                }
+            });
+
+            document.getElementById('input-form-card').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        window.deleteRecord = deleteRecord;
+        window.moveToFollowUp = async function (recordId) {
+            const index = dataRecords.findIndex(r => r.id === recordId);
+            if (index !== -1) {
+                dataRecords[index].status = 'follow-up';
+                dataRecords[index].isCompleted = false;
+                dataRecords[index].completedAt = null;
+                dataRecords[index].updatedAt = Date.now();
+                saveRecordsToLocal();
+                loadRecordsFromLocal();
+                switchTab('follow-up');
+            }
+        }
+        window.toggleDetails = function (id) {
+            const detailsElement = document.getElementById('details-' + id);
+            const button = document.getElementById('toggle-btn-' + id);
+            detailsElement.classList.toggle('open');
+            button.textContent = detailsElement.classList.contains('open') ? 'See Less' : 'See More Details';
+        };
+
+        // --- Backlog Rendering & Logic ---
+
+        const backlogModal = document.getElementById('backlog-modal');
+
+        window.openBacklogEdit = function (id) {
+            const record = dataRecords.find(r => r.id === id);
+            if (!record) return;
+
+            // Populate Read-Only Fields
+            document.getElementById('backlog-record-id').value = record.id;
+            document.getElementById('bl-display-customer').textContent = record.customer || '-';
+            document.getElementById('bl-display-product').textContent = record.product || '-';
+            document.getElementById('bl-display-so').textContent = record.soNumber || '-';
+            document.getElementById('bl-display-loan').textContent = record.loanNumber || '-';
+
+            // Populate Editable Fields (or defaults)
+            document.getElementById('bl-status').value = record.backlogStatus || 'Pending Production';
+            document.getElementById('bl-notes').value = record.backlogNotes || '';
+
+            // Dates (Fallbacks to existing Phase 1 dates if new fields unoccupied)
+            document.getElementById('bl-date-received').value = record.orderReceivedDate || record.finApprovalDate || '';
+            document.getElementById('bl-date-entry').value = record.orderEntryDate || record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : '';
+            document.getElementById('bl-date-req').value = record.customerReqDate || record.finRequestDate || '';
+
+            // Show Modal
+            backlogModal.classList.remove('hidden');
+        }
+
+        window.closeBacklogModal = function () {
+            backlogModal.classList.add('hidden');
+        }
+
+        window.saveBacklogUpdate = async function (e) {
+            e.preventDefault();
+            const id = document.getElementById('backlog-record-id').value;
+
+            const updates = {
+                backlogStatus: document.getElementById('bl-status').value,
+                backlogNotes: document.getElementById('bl-notes').value,
+                orderReceivedDate: document.getElementById('bl-date-received').value,
+                orderEntryDate: document.getElementById('bl-date-entry').value,
+                customerReqDate: document.getElementById('bl-date-req').value,
+                updatedAt: Date.now()
+            };
+
+            const index = dataRecords.findIndex(r => r.id === id);
+            if (index !== -1) {
+                // Merge updates
+                dataRecords[index] = { ...dataRecords[index], ...updates };
+                saveRecordsToLocal();
+                renderBacklog();
+                closeBacklogModal();
+            }
+        }
+
+        function renderBacklog() {
+            const backlogList = document.getElementById('backlog-table-body');
+            const emptyState = document.getElementById('backlog-empty-state');
+            const badge = document.getElementById('backlog-count-badge');
+
+            if (!backlogList) return;
+
+            // Filter records with SO#
+            const backlogRecords = dataRecords.filter(r => r.soNumber && r.soNumber.trim() !== '')
+                .sort((a, b) => b.createdAt - a.createdAt);
+
+            // Update Badge
+            if (backlogRecords.length > 0) {
+                badge.textContent = backlogRecords.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Render Table
+            if (backlogRecords.length === 0) {
+                backlogList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                backlogList.innerHTML = backlogRecords.map(r => {
+                    const blStatus = r.backlogStatus || 'Pending Production';
+                    // Determine status color
+                    let statusColor = 'bg-gray-100 text-gray-800';
+                    if (blStatus.includes('In Production')) statusColor = 'bg-blue-100 text-blue-800';
+                    if (blStatus.includes('Shipped')) statusColor = 'bg-indigo-100 text-indigo-800';
+                    if (blStatus.includes('Delivered')) statusColor = 'bg-green-100 text-green-800';
+                    if (blStatus.includes('Delayed') || blStatus.includes('Hold')) statusColor = 'bg-red-100 text-red-800';
+
+                    return `
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-bold text-gray-900">${r.customer || '-'}</div>
+                            <div class="text-xs text-gray-500">${r.product || '-'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-semibold text-gray-900">${r.soNumber}</div>
+                            <div class="text-xs text-gray-500">Loan: ${r.loanNumber || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                                <span>PO/Main Date:</span> <span class="font-medium text-gray-900">${r.date || '-'}</span>
+                                <span>Ord. Received:</span> <span class="font-medium text-gray-900">${r.orderReceivedDate || r.finApprovalDate || '-'}</span>
+                                <span>Order Entry:</span> <span class="font-medium text-gray-900">${r.orderEntryDate || '-'}</span>
+                                <span>Cust. Req:</span> <span class="font-medium text-gray-900">${r.customerReqDate || r.finRequestDate || '-'}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${statusColor}">
+                                ${blStatus}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="openBacklogEdit('${r.id}')" class="text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded shadow-sm text-xs font-bold transition">Manage Step 2</button>
+                        </td>
+                    </tr>
+                `}).join('');
+            }
+        }
+
+        // --- Follow-Up Rendering ---
+        function renderFollowUpList() {
+            const followUpRecords = dataRecords.filter(r => r.status === 'follow-up').sort((a, b) => b.updatedAt - a.updatedAt);
+
+            if (followUpRecords.length > 0) {
+                followUpCountBadge.textContent = followUpRecords.length;
+                followUpCountBadge.classList.remove('hidden');
+            } else {
+                followUpCountBadge.classList.add('hidden');
+            }
+
+            if (followUpRecords.length === 0) {
+                followUpList.innerHTML = '<p class="text-gray-500 italic p-4 bg-white rounded-lg shadow-md">No projects marked for follow-up.</p>';
+                return;
+            }
+
+            followUpList.innerHTML = followUpRecords.map(record => {
+                const loanNum = record.loanNumber || 'NO LOAN #';
+                const internalBadge = record.internalFlag ?
+                    '<span class="px-2 py-0.5 text-xs font-medium text-indigo-800 bg-indigo-100 rounded-full ml-2">INTERNAL</span>' : '';
+
+                // MUESTRA EL CLIENTE Y PRODUCTO EN FOLLOW UP
+                const summaryHtml = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xl font-bold text-gray-900">${loanNum}</h4>
+                        <span class="px-2 py-0.5 text-xs font-medium text-red-800 bg-red-100 rounded-full">DRAFT</span>
+                    </div>
+                    <div class="mb-2 text-sm text-gray-700 font-medium">
+                        📂 Customer: <span class="text-gray-900">${record.customer || '-'}</span> <span class="mx-2">|</span> 📦 Product: <span class="text-gray-900">${record.product || '-'}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3">Owner: ${record.owner || 'N/A'} | Created: ${new Date(record.createdAt).toLocaleDateString()}${internalBadge}</p>
+                    <p class="text-xs text-gray-500">Last edit: ${new Date(record.updatedAt).toLocaleString()}</p>
+                `;
+
+                const detailsHtml = `
+                    <div id="details-fu-${record.id}" class="record-details mt-3 border-t pt-3 space-y-2 text-sm text-gray-700">
+                        <div class="grid grid-cols-2 gap-2">
+                            <p><strong>Quote:</strong> ${record.quote || 'N/A'}</sstrong></p>
+                            <p><strong>SO #:</strong> ${record.soNumber || 'N/A'}</p>
+                            <p><strong>UCID:</strong> ${record.ucid || 'N/A'}</p>
+                            <p><strong>P20:</strong> ${record.p20 || 'N/A'}</p>
+                            <p><strong>Pre Exp Shipping:</strong> ${record.preExpShipping || 'N/A'}</p>
+                            <p><strong>Holds:</strong> ${record.holds || 'N/A'}</p>
+                            <p><strong>Hold Status:</strong> ${record.holdStatus || 'N/A'}</p>
+                            <p><strong>Fin Request Date:</strong> ${record.finRequestDate || 'N/A'}</p>
+                            <p><strong>Fin Approval Date:</strong> ${record.finApprovalDate || 'N/A'}</p>
+                        </div>
+                        <div class="pt-2">
+                            <p class="font-semibold">Comments:</p>
+                            <p class="whitespace-pre-wrap text-gray-600">${record.comments || 'No comments.'}</p>
+                        </div>
+                        <div class="pt-2">
+                            <p class="font-semibold">Loan Options:</p>
+                            <div class="grid grid-cols-2 gap-2 text-xs mt-1">
+                                <p><strong>Canada?:</strong> ${getMilestoneBadge(record.canadaFlag, 'canadaFlag')}</p>
+                                <p><strong>Reuse:</strong> ${getMilestoneBadge(record.reuse, 'reuse')}</p>
+                                <p><strong>Phase 0:</strong> ${getMilestoneBadge(record.phase0, 'phase0')}</p>
+                                <p><strong>HM approval:</strong> ${getMilestoneBadge(record.hmApproval, 'hmApproval')}</p>
+                                <p><strong>License:</strong> ${getMilestoneBadge(record.license, 'license')}</p>
+                                <p><strong>Installation:</strong> ${getMilestoneBadge(record.installation, 'installation')}</p>
+                                ${renderWorkflowBadges(record.workflowSnapshot)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                return `
+                    <div class="p-5 rounded-xl shadow-lg border-l-4 border-red-500 bg-white flex flex-col transition duration-150">
+                        ${summaryHtml}
+                        ${generateTimelineHTML(record)}
+                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <div class="flex space-x-2 flex-shrink-0">
+                                <button id="toggle-btn-fu-${record.id}" onclick="window.toggleDetails('fu-${record.id}')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-gray-100 hover:bg-gray-200 text-gray-700">See More Details</button>
+                                <button onclick="window.editRecord('${record.id}', 'follow-up')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-[#01A982] hover:bg-green-600 text-white">Edit</button>
+                                <button onclick="window.deleteRecord('${record.id}')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-red-500 hover:bg-red-600 text-white">Delete</button>
+                            </div>
+                            <button onclick="window.saveRecord({}, '${record.id}', 'history')" 
+                                class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-green-500 hover:bg-green-600 text-white">Save to History</button>
+                        </div>
+                        ${detailsHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Timeline Generation ---
+        function generateTimelineHTML(record) {
+            // Steps Definition
+            // Step Logic: active if conditionMet
+            const steps = [
+                { id: 'loan', label: 'Loan', active: true }, // Always active if card exists
+                { id: 'ucid', label: 'UCID', active: !!(record.ucid && record.ucid.trim()) },
+                { id: 'ngq', label: 'NGQ', active: !!(record.workflowSnapshot && record.workflowSnapshot['check-ngo-quote']) },
+                { id: 'ngqc', label: 'NGQC', active: !!(record.workflowSnapshot && record.workflowSnapshot['check-ngo-converted']) },
+                { id: 'so', label: 'S.O.', active: !!(record.soNumber && record.soNumber.trim()) },
+                { id: 'esd', label: 'ESD', active: !!(record.preExpShipping && record.preExpShipping.trim()) }, // Mapped to Pre Exp Shipping per request logic
+                { id: 'lic', label: 'Lic', active: (record.license === 'Requested' || record.license === 'Returned' || record.license === 'Needed') },
+                { id: 'ship', label: 'Ship', active: (record.backlogStatus && (record.backlogStatus.includes('Shipped') || record.backlogStatus.includes('Delivered'))) }
+            ];
+
+            let html = '<div class="flex items-center justify-between w-full my-4 px-2">';
+
+            steps.forEach((step, index) => {
+                if (step.id === 'lic' && record.license === 'Not Required') {
+                    step.active = true; // Mark as active for timeline flow
+                }
+
+                const isLast = index === steps.length - 1;
+
+                // Determine colors based on state
+                let activeClass = step.active ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-300 border-gray-200';
+                let textClass = step.active ? 'text-teal-700 font-bold' : 'text-gray-400';
+
+                // Special Color for License: Not Required
+                if (step.id === 'lic' && record.license === 'Not Required') {
+                    activeClass = 'bg-gray-400 text-white border-gray-400';
+                    textClass = 'text-gray-500 font-bold';
+                }
+
+                const connectorClass = (step.active && !isLast && steps[index + 1].active) ? 'bg-teal-500' : 'bg-gray-200';
+
+                // Step Circle
+                html += `
+                    <div class="flex flex-col items-center relative z-10">
+                        <div class="w-6 h-6 rounded-full border-2 ${activeClass} flex items-center justify-center text-[10px] transition-all duration-500">
+                             ${step.active ? '✓' : ''}
+                        </div>
+                        <span class="text-[9px] mt-1 uppercase tracking-wide ${textClass}">${step.label}</span>
+                    </div>
+                `;
+
+                // Connector (Ensure connector stays gray if one of the connected nodes is "Not Required"/Special, or keep it teal if desired. 
+                // User asked for the LINE to be marked as completed but color different. 
+                // Using Gray for the node is safe. If we want the line to be teal we keep connectorClass logic.
+                // However, if the node is gray, a teal line entering it might look weird. Let's keep the connector logic standard (teal if both active)
+                // EXCEPT if we want to denote a "skipped/not required" path. 
+                // Let's stick to the User request: "mark as completed but in a different color".
+
+                if (!isLast) {
+                    html += `<div class="flex-grow h-0.5 mx-1 -mt-3.5 relative z-0 ${connectorClass} transition-all duration-500"></div>`;
+                }
+            });
+
+            html += '</div>';
+            return html;
+        }
+
+        function renderRecords() {
+            const historyRecords = dataRecords.filter(r => r.status === 'history').sort((a, b) => b.updatedAt - a.updatedAt);
+            const searchTerm = historySearchInput ? historySearchInput.value.toLowerCase() : '';
+
+            const filteredRecords = historyRecords.filter(record => {
+                if (!searchTerm) return true;
+                return (
+                    (record.loanNumber && record.loanNumber.toLowerCase().includes(searchTerm)) ||
+                    (record.owner && record.owner.toLowerCase().includes(searchTerm)) ||
+                    (record.status && record.status.toLowerCase().includes(searchTerm)) ||
+                    (record.customer && record.customer.toLowerCase().includes(searchTerm)) || // Busqueda por Cliente
+                    (record.product && record.product.toLowerCase().includes(searchTerm))      // Busqueda por Producto
+                );
+            });
+
+            if (filteredRecords.length === 0) {
+                recordsList.innerHTML = `<p class="text-gray-500 italic p-4 bg-white rounded-lg shadow-md">${searchTerm ? 'No projects found with that term.' : 'No saved projects. Start by adding one!'}</p>`;
+                loadingOverlay.classList.add('hidden');
+                return;
+            }
+
+            recordsList.innerHTML = filteredRecords.map(record => {
+                const completedStyle = record.isCompleted ? 'bg-green-50 border-green-500' : 'bg-white border-gray-200';
+                const titleStyle = record.isCompleted ? 'text-gray-900' : 'text-gray-900';
+                const statusBadge = record.status ? `<span class="px-2 py-0.5 text-xs font-medium text-[#01A982] bg-green-100 rounded-full">${record.status}</span>` : '';
+                const loanNum = record.loanNumber || 'NO LOAN #';
+                const internalBadge = record.internalFlag ? '<span class="px-2 py-0.5 text-xs font-medium text-indigo-800 bg-indigo-100 rounded-full ml-2">INTERNAL</span>' : '';
+
+                // MUESTRA CLIENTE Y PRODUCTO EN HISTORIAL
+                const summaryHtml = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xl font-bold ${titleStyle}">${loanNum}</h4>
+                        <div>${statusBadge}</div>
+                    </div>
+                    <div class="mb-2 text-sm text-gray-700 font-medium">
+                        📂 Customer: <span class="text-gray-900">${record.customer || '-'}</span> <span class="mx-2">|</span> 📦 Product: <span class="text-gray-900">${record.product || '-'}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3">Owner: ${record.owner || 'N/A'} | Date: ${record.date || 'N/A'}${internalBadge}</p>
+                `;
+
+                const detailsHtml = `
+                    <div id="details-${record.id}" class="record-details mt-3 border-t pt-3 space-y-2 text-sm text-gray-700">
+                        <div class="grid grid-cols-2 gap-2">
+                            <p><strong>Quote:</strong> ${record.quote || 'N/A'}</p>
+                            <p><strong>SO #:</strong> ${record.soNumber || 'N/A'}</p>
+                            <p><strong>UCID:</strong> ${record.ucid || 'N/A'}</p>
+                            <p><strong>P20:</strong> ${record.p20 || 'N/A'}</p>
+                            <p><strong>Pre Exp Shipping:</strong> ${record.preExpShipping || 'N/A'}</p>
+                            <p><strong>Holds:</strong> ${record.holds || 'N/A'}</p>
+                            <p><strong>Hold Status:</strong> ${record.holdStatus || 'N/A'}</p>
+                            <p><strong>Fin Request Date:</strong> ${record.finRequestDate || 'N/A'}</p>
+                            <p><strong>Fin Approval Date:</strong> ${record.finApprovalDate || 'N/A'}</p>
+                        </div>
+                        <div class="pt-2">
+                            <p class="font-semibold">Comments:</p>
+                            <p class="whitespace-pre-wrap text-gray-600">${record.comments || 'No comments.'}</p>
+                        </div>
+                        <div class="pt-2">
+                            <p class="font-semibold">Loan Options:</p>
+                            <div class="grid grid-cols-2 gap-2 text-xs mt-1">
+                                <p><strong>Canada?:</strong> ${getMilestoneBadge(record.canadaFlag, 'canadaFlag')}</p>
+                                <p><strong>Reuse:</strong> ${getMilestoneBadge(record.reuse, 'reuse')}</p>
+                                <p><strong>Phase 0:</strong> ${getMilestoneBadge(record.phase0, 'phase0')}</p>
+                                <p><strong>HM approval:</strong> ${getMilestoneBadge(record.hmApproval, 'hmApproval')}</p>
+                                <p><strong>License:</strong> ${getMilestoneBadge(record.license, 'license')}</p>
+                                <p><strong>Installation:</strong> ${getMilestoneBadge(record.installation, 'installation')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                return `
+                    <div class="p-5 rounded-xl shadow-lg border-l-4 ${completedStyle} flex flex-col transition duration-150">
+                        ${summaryHtml}
+                        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+                            <div class="flex space-x-2 flex-shrink-0">
+                                <button id="toggle-btn-${record.id}" onclick="window.toggleDetails('${record.id}')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-gray-100 hover:bg-gray-200 text-gray-700">See More Details</button>
+                                <button onclick="window.editRecord('${record.id}', 'history')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-[#01A982] hover:bg-green-600 text-white">Edit</button>
+                                <button onclick="window.deleteRecord('${record.id}')" 
+                                    class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-red-500 hover:bg-red-600 text-white">Delete</button>
+                            </div>
+                            <button onclick="window.moveToFollowUp('${record.id}')" 
+                                class="px-3 py-1 text-xs font-medium rounded-lg shadow-sm transition duration-150 bg-orange-500 hover:bg-orange-600 text-white">Move to Follow-up</button>
+                        </div>                        
+                        ${detailsHtml}
+                    </div>
+                `;
+            }).join('');
+            loadingOverlay.classList.add('hidden');
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = function () {
+            loadRecordsFromLocal();
+            loadWorkflowState();
+            loadSupportNotes();
+            loadSupportLinks(); renderSupportLinks();
+            loadSupportFiles(); renderSupportFiles();
+            loadTasks();
+            switchTab('tasks');
+            resetForm();
+            document.getElementById('storage-status').textContent = 'Storage: LocalStorage (Offline)';
+        };
+    </script>
+</body>
+
+</html>
